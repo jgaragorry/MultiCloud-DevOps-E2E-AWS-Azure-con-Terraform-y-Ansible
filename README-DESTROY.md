@@ -1,16 +1,21 @@
 # 🧹 Guía de Destrucción Completa (FinOps)
 
+<p>
+  <img src="https://img.shields.io/badge/FinOps-COST%20CONTROL-F29020?style=for-the-badge&logo=awscostexplorer"/>
+  <img src="https://img.shields.io/badge/Terraform-DESTROY-E84D1C?style=for-the-badge&logo=terraform&logoColor=white"/>
+</p>
+
 Para asegurar que no se incurra en ningún costo residual en AWS o Azure, es **crítico** seguir el orden de destrucción correcto.
 
 El proyecto está diseñado con una **Separación de Ciclo de Vida (Mejor Práctica SRE)**:
-1.  **La Infraestructura:** Las VMs, Redes, IPs, etc. Son *volátiles* (se crean y destruyen a menudo).
-2.  **El Backend:** El Storage Account en Azure que contiene el archivo de estado (`.tfstate`). Es *persistente* (contiene el historial).
+1.  **La Infraestructura (💥):** Las VMs, Redes, IPs, etc. Son *volátiles* (se crean y destruyen a menudo).
+2.  **El Backend (💾):** El Storage Account en Azure que contiene el archivo de estado (`.tfstate`). Es *persistente* (contiene el historial).
 
-**NUNCA** destruyas el Backend (Paso 2) antes de destruir la Infraestructura (Paso 1). Si lo haces, Terraform perderá el "mapa" de tus recursos y no podrá eliminarlos, resultando en "recursos huérfanos" que siguen generando costos.
+**NUNCA** destruyas el Backend (Paso 2) antes de destruir la Infraestructura (Paso 1). Si lo haces, Terraform perderá el "mapa" de tus recursos y no podrá eliminarlos, resultando en "recursos huérfanos" 👻 que siguen generando costos.
 
 ---
 
-### Paso 1 (Crítico): Destruir la Infraestructura (VMs, Redes, IPs)
+### Paso 1 (Crítico): Destruir la Infraestructura (VMs, Redes, IPs) 💥
 
 Este comando utiliza el `backend` (Paso 2) para leer el archivo de estado (`.tfstate`) y destruir metódicamente todos los 21 recursos que gestiona (las 3 VMs, redes, firewalls, etc.) en ambas nubes.
 
@@ -22,11 +27,11 @@ Este comando utiliza el `backend` (Paso 2) para leer el archivo de estado (`.tfs
 3.  Terraform calculará un plan de `Plan: 0 to add, 0 to change, 21 to destroy.`
 4.  Confirma la destrucción escribiendo `destruir` cuando se te solicite.
 5.  Espera a que el proceso termine.
-    * **Resultado Esperado:** `Destroy complete! Resources: 21 destroyed.`
+    * **✅ Resultado Esperado:** `Destroy complete! Resources: 21 destroyed.`
 
 ---
 
-### Paso 2 (Limpieza Total): Destruir el Backend (El Estado)
+### Paso 2 (Limpieza Total): Destruir el Backend (El Estado) 🗑️
 
 Ahora que la infraestructura ha sido eliminada, el único recurso que queda es el Resource Group en Azure que aloja nuestro archivo de estado.
 
@@ -42,6 +47,6 @@ Ahora que la infraestructura ha sido eliminada, el único recurso que queda es e
     ./scripts/backend_bootstrap/azure/destroy_backend_azure.sh
     ```
 3.  Confirma la destrucción escribiendo `destruir`.
-    * **Resultado Esperado:** `--- Backend Azure Destruido ---`
+    * **✅ Resultado Esperado:** `--- Backend Azure Destruido ---`
 
 Con estos dos pasos completados, tus cuentas de AWS y Azure están **100% limpias** y no se generarán más cargos.
