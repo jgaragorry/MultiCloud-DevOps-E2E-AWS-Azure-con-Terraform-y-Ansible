@@ -17,11 +17,10 @@ terraform {
   }
 
   # --- CONFIGURACIÓN DEL BACKEND ---
-  # ¡ESTE ES EL BLOQUE CORREGIDO!
-  # Rellenado con los valores de tu output de Fase 1
+  # Apuntando al backend que acabas de crear
   backend "azurerm" {
-    resource_group_name  = "rg-wstfstate-obs-630-backend"
-    storage_account_name = "stwstfstateobs63030756"
+    resource_group_name  = "rg-wstfstate149-backend"
+    storage_account_name = "stwstfstate14913903"
     container_name       = "tfstate"
     key                  = "multicloud-obs/terraform.tfstate"
   }
@@ -37,7 +36,6 @@ provider "aws" {
 }
 
 provider "azurerm" {
-  # Dejamos 'features' vacío, ya que 'default_tags' daba problemas.
   features {}
 }
 

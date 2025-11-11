@@ -5,106 +5,102 @@
   <img src="https://img.shields.io/badge/IaC-8A2BE2?style=for-the-badge"/>
   <img src="https://img.shields.io/badge/Terraform-7B42BC?style=for-the-badge&logo=terraform&logoColor=white"/>
   <img src="https://img.shields.io/badge/Ansible-EE0000?style=for-the-badge&logo=ansible&logoColor=white"/>
-  <img src="https://img.shields.io/badge/DevSecOps-E84D1C?style=for-the-badge"/>
+  <img src="https://img.shields.io/badge/Prometheus-E6522C?style=for-the-badge&logo=prometheus&logoColor=white"/>
+  <img src="https://img.shields.io/badge/Grafana-F46800?style=for-the-badge&logo=grafana&logoColor=white"/>
   <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge"/>
   <img src="https://img.shields.io/badge/Contributions-Welcome-blue?style=for-the-badge"/>
 </p>
 
-# 📘 Workshop DevOps Multi-Nube E2E (AWS-Azure) con Terraform y Ansible
+# 📘 Workshop SRE: Pila de Observabilidad Multi-Nube (AWS-Azure)
 
 ## 🎯 1. Descripción y Objetivos
 
-Este repositorio contiene el código y la documentación de un workshop práctico de DevOps/SRE. El objetivo es desplegar una arquitectura multi-nube en AWS y Azure de forma simultánea, gestionada al 100% como Infraestructura como Código (IaC).
+Este repositorio contiene el código y la documentación de un workshop práctico de nivel avanzado de SRE/DevOps. El objetivo es desplegar una arquitectura multi-nube robusta y **auto-monitoreada** en AWS y Azure, gestionada 100% como Infraestructura como Código (IaC).
 
-Utilizamos Terraform para desplegar la infraestructura de red y cómputo, y Ansible para la configuración automatizada de las máquinas virtuales.
+Este proyecto va más allá de un simple despliegue; se enfoca en la **depuración realista** y la implementación de una pila de **Observabilidad** completa (`Prometheus` + `Grafana`) que se auto-configura.
 
 **Objetivos Clave del Taller:**
 - Multi-Nube Real: Desplegar recursos en AWS y Azure en un solo apply.
-- Dependencia Multi-Nube: Demostrar cómo un recurso en una nube (ej. firewall de AWS) puede depender de un recurso en otra nube (ej. IP de Azure).
-- Mejores Prácticas SRE: Implementar un backend remoto (en Azure Storage) para la gestión segura y colaborativa del estado (.tfstate), con un ciclo de vida 100% independiente de la infraestructura.
-- Configuración (DevOps): Usar Ansible para instalar node_exporter en ambas VMs, ejecutado automáticamente por Terraform.
-- FinOps: Usar scripts deploy y destroy para un control de costos estricto, y documentar el proceso de limpieza total.
-- Depuración Realista: Exponer y documentar errores comunes (Firewalls, Sintaxis, Asimetría de Nubes) como parte del proceso de aprendizaje.
+- Backend remoto seguro en Azure Storage para el estado de Terraform.
+- Pila de Observabilidad: Prometheus + Grafana en VM dedicada.
+- Auto-configuración con Ansible: Node Exporter en targets, Prometheus configurado automáticamente, Grafana con dashboard listo.
+- Depuración realista: documentar y resolver errores comunes.
 
 ---
 
 ## 🏗️ 2. Arquitectura de la Solución
 
-1. **Backend (Azure):** Resource Group separado (rg-wstfstate-backend) con Storage Account (stwstfstate...) que almacena terraform.tfstate con versionado y cifrado.  
-2. **Infraestructura AWS (VPC):** 1 VPC, 1 Subnet Pública, 1 Internet Gateway, 1 Tabla de Rutas, 1 Instancia EC2 (Ubuntu 20.04), 1 Security Group.  
-3. **Infraestructura Azure (VNet):** 1 Resource Group (rg-workshop-multicloud-dev), 1 VNet, 1 Subnet, 1 VM Linux (Ubuntu 20.04) con IP Pública y NIC, 1 NSG.  
-4. **Conexión Multi-Nube:** AWS permite puerto 9100 solo desde IP de Azure y local. Azure permite puerto 9100 solo desde IP de AWS y local.  
-5. **Configuración (Ansible):** Terraform genera inventario (generated_inventory.ini) y ejecuta ansible-playbook para instalar node_exporter.
+1. **Backend (Azure):** Resource Group separado (`rg-wstfstate-backend`) con Storage Account (`stwstfstate...`) que almacena terraform.tfstate.  
+2. **Infraestructura Target AWS:** VPC, Subnet pública, IGW, Tabla de rutas, EC2 Ubuntu 20.04, SG `workshop-vm-sg`.  
+3. **Infraestructura Target Azure:** Resource Group `rg-workshop-multicloud-dev`, VNet, Subnet, VM Ubuntu 20.04, NSG `nsg-workshop`.  
+4. **Infraestructura de Monitoreo (AWS):** EC2 Ubuntu 20.04 (`t3.small`) con SG `monitoring-sg` que permite puertos 22, 3000 (Grafana), 9090 (Prometheus).  
+5. **Lógica de Red:** Targets permiten puerto 9100 solo desde VM de monitoreo y la IP local. AWS usa IP privada, Azure IP pública.  
+6. **Configuración (Ansible):** Terraform genera `inventory.ini` con 3 hosts (`aws_target`, `azure_target`, `monitoring_server`). Prometheus se configura para scrapear IP privada de AWS y pública de Azure.
 
 ---
 
-## 🚀 3. Guía de Ejecución (How-To)
+## 🚀 3. Guía de Ejecución
 
-### 🔧 Prerrequisitos
-Instala en tu máquina local:
-- terraform (v1.13.x+)
-- ansible (v2.16.x+)
-- aws-cli
-- az-cli
-- Claves SSH (ej. ~/.ssh/id_rsa.pub)
+### Prerrequisitos
+- terraform (v1.13.x+)  
+- ansible (v2.16.x+)  
+- aws-cli  
+- az-cli  
+- Claves SSH (`~/.ssh/id_rsa` y `~/.ssh/id_rsa.pub`)
 
-### 🔐 Paso 1: Autenticación
+### Paso 1: Autenticación
 aws configure  
 az login  
 az account list --output table  
 az account set --subscription "Tu-Subscription-ID-o-Nombre"
 
-### 📦 Paso 2: Crear el Backend
+### Paso 2: Crear Backend
 export LOCATION="eastus"  
-export BASE_NAME="wstfstate$(date +%s | tail -c 4)"  
+export BASE_NAME="wstfstate-obs-$(date +%s | tail -c 4)"  
 echo "Tu BASE_NAME es: $BASE_NAME"  
 ./scripts/backend_bootstrap/azure/create_backend_azure.sh  
-Output: anota Resource Group y Storage Account
 
-### ⚙️ Paso 3: Configurar Terraform
-Editar terraform_infra/main.tf → descomentar backend "azurerm"  
-Rellenar nombres del Resource Group y Storage Account  
+### Paso 3: Configurar Terraform
+Editar `terraform_infra/main.tf` → descomentar backend "azurerm".  
+Rellenar RG y Storage Account.  
 cp terraform_infra/terraform.tfvars.example terraform_infra/terraform.tfvars  
-Asegúrate de que admin_public_key_path apunte a tu clave .pub
+Editar `variables.tf` → `admin_public_key_path` debe apuntar a tu clave privada (`id_rsa`).
 
-### 🚀 Paso 4: Desplegar la Infraestructura
+### Paso 4: Desplegar Pila Completa
 ./scripts/infra_deployment/deploy_infra.sh  
-Ejecuta init, validate, plan y apply  
-Terraform desplegará los recursos y luego ejecutará Ansible
+Terraform desplegará 21 recursos y Ansible configurará las 3 VMs.
 
-### ✅ Paso 5: Validación (Smoke Test)
-curl http://<IP_AWS>:9100/metrics  
-curl http://<IP_AZURE>:9100/metrics  
-ssh ubuntu@<IP_AWS>  
-ssh gmt@<IP_AZURE>
+### Paso 5: Validación
+- Prometheus: http://<IP_MONITORING>:9090 → Status -> Targets → 2/2 UP.  
+- Grafana: http://<IP_MONITORING>:3000 → admin/admin → Data Sources y Dashboard “Node Exporter Full” listos.
 
 ---
 
 ## 🧹 4. Guía de Destrucción (FinOps)
 
-CRÍTICO: Sigue estos pasos para eliminar todos los recursos y evitar costos.
-
-### Paso 1: Destruir Infraestructura  
 ./scripts/infra_deployment/destroy_infra.sh  
-Escribe 'destruir' para confirmar  
-Resultado: Destroy complete! Resources: 18 destroyed
+Confirmar escribiendo `destruir`.  
+Resultado: 21 recursos destruidos.  
 
-### Paso 2: Destruir Backend  
-export BASE_NAME="wstfstate..."  
+Opcional: destruir backend si no se usará más.  
+export BASE_NAME="wstfstate-obs-..."  
 ./scripts/backend_bootstrap/azure/destroy_backend_azure.sh  
-Escribe 'destruir' para confirmar  
-Resultado: --- Backend Azure Destruido ---
+Confirmar escribiendo `destruir`.
 
 ---
 
 ## 💡 5. Lecciones Aprendidas
 
-1. Sintaxis de Proveedor (AWS vs Azure): default_tags en azurerm causó conflicto. Solución: etiquetado por recurso.  
-2. Nomenclatura (AWS): Prefijo sg- reservado. Solución: renombrar a workshop-vm-sg.  
-3. Sintaxis de Ansible: listen no válido en tasks. Solución: mover a handlers/main.yml.  
-4. Asimetría de Nube (Usuarios): Azure usa gmt, AWS usa ubuntu. Solución: ajustar ansible_user.  
-5. Sintaxis de Proveedor (CIDR): aws_security_group requiere /32. Solución: añadir sufijo /32 en ingress.  
-6. Firewall (Validación): curl falló con timeout. Solución: añadir IP local en reglas ingress.
+1. Condición de carrera (SSH): Terraform debe esperar a que sshd esté activo antes de Ansible.  
+2. Punto ciego de Terraform: triggers en null_resource para detectar cambios en archivos Ansible.  
+3. Lógica de red: Ansible usa IP pública, Prometheus IP privada.  
+4. Firewalls: targets deben permitir IP de VM de monitoreo.  
+5. Prometheus: escuchar en 0.0.0.0:9090.  
+6. Configuración corrupta: corregir template prometheus.yml.  
+7. Asimetría de usuarios: AWS usa `ubuntu`, Azure `gmt`.  
+8. CIDR: AWS requiere /32.  
+9. Sintaxis Ansible: handlers separados de tasks.  
+10. Nomenclatura AWS: prefijo sg- reservado.
 
 ---
 
@@ -113,24 +109,23 @@ Resultado: --- Backend Azure Destruido ---
                  ┌───────────────────────────┐
                  │        Azure Cloud        │
                  │   ┌───────────────────┐   │
-                 │   │ Resource Group    │   │
-                 │   │ VNet + Subnet     │   │
-                 │   │ NSG (Firewall)    │   │
-                 │   │ VM Linux (gmt)    │   │
+                 │   │ VM Target (gmt)   │   │
                  │   │ Node Exporter :9100 │ │
                  │   └───────────────────┘   │
                  └───────────────────────────┘
                            ▲
-                           │ Comunicación segura (puerto 9100)
+                           │ Comunicación segura (9100)
                            ▼
                  ┌───────────────────────────┐
                  │         AWS Cloud         │
                  │   ┌───────────────────┐   │
-                 │   │ VPC + Subnet      │   │
-                 │   │ Route Table       │   │
-                 │   │ Security Group    │   │
-                 │   │ EC2 Linux (ubuntu)│   │
+                 │   │ VM Target (ubuntu)│   │
                  │   │ Node Exporter :9100 │ │
+                 │   └───────────────────┘   │
+                 │   ┌───────────────────┐   │
+                 │   │ VM Monitoreo      │   │
+                 │   │ Prometheus :9090  │   │
+                 │   │ Grafana :3000     │   │
                  │   └───────────────────┘   │
                  └───────────────────────────┘
 
@@ -139,12 +134,13 @@ Resultado: --- Backend Azure Destruido ---
 ## 📞 Contacto y Comunidad
 
 - 💼 LinkedIn: [linkedin.com/in/jgaragorry](https://www.linkedin.com/in/jgaragorry)  
-- 🎥 YouTube: [youtube.com/@jgaragorry](https://www.youtube.com/@Softraincorp)  
-- 🎵 TikTok: [tiktok.com/@jgaragorry](https://www.tiktok.com/@softtraincorp)  
-- 📸 Instagram: [instagram.com/jgaragorry](https://www.instagram.com/stclatam/)  
-- 💬 Comunidad WhatsApp: (https://chat.whatsapp.com/ENuRMnZ38fv1pk0mHlSixa)
+- 🎥 YouTube: [youtube.com/@Softraincorp](https://www.youtube.com/@Softraincorp)  
+- 🎵 TikTok: [tiktok.com/@softtraincorp](https://www.tiktok.com/@softtraincorp)  
+- 📸 Instagram: [instagram.com/stclatam](https://www.instagram.com/stclatam/)  
+- 💬 Comunidad WhatsApp: [Unirse al grupo](https://chat.whatsapp.com/ENuRMnZ38fv1pk0mHlSixa)
 
 ---
 
 ✍️ **Autor:** José Garagorry  
-🔗 **Repo principal:** MultiCloud-DevOps-E2E-A
+🔗 **Repo principal:** MultiCloud-DevOps-E2E-AWS-Azure-con-Terraform-y-Ansible  
+📜 **
