@@ -1,0 +1,54 @@
+---
+# Tareas para instalar node_exporter
+- name: Definir la versión de node_exporter
+  set_fact:
+    node_exporter_version: "1.7.0"
+    node_exporter_arch: "amd64"
+
+- name: Crear un usuario de sistema 'node_exporter'
+  ansible.builtin.user:
+    name: node_exporter
+    shell: /bin/false
+    system: yes
+    create_home: no
+
+- name: Descargar y descomprimir Node Exporter
+  ansible.builtin.unarchive:
+    src: "https://github.com/prometheus/node_exporter/releases/download/v{{ node_exporter_version }}/node_exporter-{{ node_exporter_version }}.linux-{{ node_exporter_arch }}.tar.gz"
+    dest: "/tmp/"
+    remote_src: yes
+    mode: 0755
+
+- name: Copiar el binario a /usr/local/bin
+  ansible.builtin.copy:
+    src: "/tmp/node_exporter-{{ node_exporter_version }}.linux-{{ node_exporter_arch }}/node_exporter"
+    dest: "/usr/local/bin/node_exporter"
+    remote_src: yes
+    mode: 0755
+    owner: root
+    group: root
+
+- name: Limpiar el directorio y .tar.gz descargado
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "/tmp/node_exporter-{{ node_exporter_version }}.linux-{{ node_exporter_arch }}.tar.gz"
+    - "/tmp/node_exporter-{{ node_exporter_version }}.linux-{{ node_exporter_arch }}"
+
+- name: Crear el fichero de servicio de systemd
+  ansible.builtin.template:
+    src: "node_exporter.service.j2" # Ahora sí existe
+    dest: "/etc/systemd/system/node_exporter.service"
+    owner: root
+    group: root
+    mode: 0644
+  notify: # Dispara un 'handler' si este archivo cambia
+    - Recargar systemd
+    - Reiniciar node_exporter
+
+- name: Asegurar que el servicio esté habilitado e iniciado
+  ansible.builtin.systemd:
+    name: node_exporter
+    enabled: yes
+    state: started

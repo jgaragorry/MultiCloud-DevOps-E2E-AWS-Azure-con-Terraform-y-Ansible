@@ -1,0 +1,13 @@
+---
+- name: 1. Configurar Node Exporter en los servidores objetivo
+  hosts: targets
+  become: yes
+  roles:
+    - node_exporter # Rol que ya teníamos
+
+- name: 2. Configurar la Pila de Monitoreo (Prometheus + Grafana)
+  hosts: monitoring_server
+  become: yes
+  roles:
+    - prometheus # Nuevo rol
+    - grafana    # Nuevo rol

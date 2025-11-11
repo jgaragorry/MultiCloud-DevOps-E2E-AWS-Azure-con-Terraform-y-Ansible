@@ -1,0 +1,88 @@
+---
+- name: Definir la versión de Prometheus
+  set_fact:
+    prometheus_version: "2.51.1"
+    prometheus_arch: "amd64"
+
+- name: Crear un usuario de sistema 'prometheus'
+  ansible.builtin.user:
+    name: prometheus
+    shell: /bin/false
+    system: yes
+    create_home: no
+
+- name: Crear directorios de configuración y datos
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: prometheus
+    group: prometheus
+    mode: 0755
+  loop:
+    - /etc/prometheus
+    - /var/lib/prometheus
+
+- name: Descargar y descomprimir Prometheus
+  ansible.builtin.unarchive:
+    src: "https://github.com/prometheus/prometheus/releases/download/v{{ prometheus_version }}/prometheus-{{ prometheus_version }}.linux-{{ prometheus_arch }}.tar.gz"
+    dest: "/tmp/"
+    remote_src: yes
+    mode: 0755
+
+- name: Copiar binarios de Prometheus
+  ansible.builtin.copy:
+    src: "/tmp/prometheus-{{ prometheus_version }}.linux-{{ prometheus_arch }}/{{ item }}"
+    dest: "/usr/local/bin/{{ item }}"
+    remote_src: yes
+    mode: 0755
+    owner: root
+    group: root
+  loop:
+    - prometheus
+    - promtool
+
+- name: Copiar consolas y librerías
+  ansible.builtin.copy:
+    src: "/tmp/prometheus-{{ prometheus_version }}.linux-{{ prometheus_arch }}/{{ item }}"
+    dest: "/etc/prometheus/{{ item }}"
+    remote_src: yes
+    owner: prometheus
+    group: prometheus
+  loop:
+    - consoles
+    - console_libraries
+
+- name: Crear fichero de configuración 'prometheus.yml'
+  ansible.builtin.template:
+    # --- ¡ESTA ES LA CORRECCIÓN! ---
+    # Asegurarse de que el 'src' es 'prometheus.yml.j2'
+    src: "prometheus.yml.j2"
+    dest: "/etc/prometheus/prometheus.yml"
+    owner: prometheus
+    group: prometheus
+    mode: 0644
+  notify: Reiniciar Prometheus # Solo necesitamos notificar el reinicio
+
+- name: Crear el fichero de servicio de systemd
+  ansible.builtin.template:
+    # --- ¡ESTA ES LA CORRECCIÓN! ---
+    # Asegurarse de que el 'src' es 'prometheus.service.j2'
+    src: "prometheus.service.j2"
+    dest: "/etc/systemd/system/prometheus.service"
+    owner: root
+    group: root
+    mode: 0644
+  notify: # Notificamos a ambos
+    - Recargar systemd
+    - Reiniciar Prometheus
+
+- name: Asegurar que el servicio esté habilitado e iniciado
+  ansible.builtin.systemd:
+    name: prometheus
+    enabled: yes
+    state: started
+
+- name: Limpiar los archivos descargados
+  ansible.builtin.file:
+    path: "/tmp/prometheus-{{ prometheus_version }}.linux-{{ prometheus_arch }}"
+    state: absent

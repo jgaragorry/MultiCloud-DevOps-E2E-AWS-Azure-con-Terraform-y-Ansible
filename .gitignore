@@ -1,0 +1,38 @@
+# Terraform
+*.tfstate
+*.tfstate.backup
+.terraform/
+crash.log
+
+# SSH keys
+id_rsa
+id_rsa.pub
+
+# Ansible
+*.retry
+inventory.ini
+
+# Logs
+*.log
+
+# Archivos sensibles
+*.pem
+*.key
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Docker
+*.tar.gz
+*.zip
+.dockerignore
+
+# Sistema
+.DS_Store
+.env
+
+# ... (contenido existente) ...
+
+# Archivos generados por Ansible/Terraform
+generated_inventory.ini

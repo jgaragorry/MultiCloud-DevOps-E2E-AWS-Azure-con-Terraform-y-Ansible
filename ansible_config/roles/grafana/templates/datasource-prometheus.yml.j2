@@ -1,0 +1,11 @@
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    # URL interna donde Grafana (en la VM de Monitoreo)
+    # puede encontrar a Prometheus (en la misma VM)
+    url: http://localhost:9090
+    isDefault: true
+    editable: false

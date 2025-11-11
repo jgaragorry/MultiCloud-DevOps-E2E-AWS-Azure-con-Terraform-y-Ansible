@@ -1,0 +1,76 @@
+---
+- name: Instalar prerrequisitos de Grafana
+  ansible.builtin.apt:
+    name:
+      - apt-transport-https
+      - software-properties-common
+      - wget
+    state: present
+    update_cache: yes
+    force_apt_get: yes # Añadido para robustez
+
+- name: Añadir clave GPG de Grafana
+  ansible.builtin.apt_key:
+    url: https://packages.grafana.com/gpg.key
+    state: present
+
+- name: Añadir repositorio de Grafana
+  ansible.builtin.apt_repository:
+    repo: "deb https://packages.grafana.com/oss/deb stable main"
+    state: present
+
+- name: Instalar Grafana
+  ansible.builtin.apt:
+    name: grafana
+    state: present
+    update_cache: yes
+    force_apt_get: yes # Añadido para robustez
+
+# --- ¡NUEVAS TAREAS DE PROVISIONING! ---
+
+- name: Crear directorios de provisioning para Grafana
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: grafana
+    group: grafana
+    mode: 0755
+  loop:
+    - /etc/grafana/provisioning/datasources
+    - /etc/grafana/provisioning/dashboards
+    - /var/lib/grafana/dashboards
+
+- name: Copiar la plantilla del Data Source de Prometheus
+  ansible.builtin.template:
+    src: "datasource-prometheus.yml.j2"
+    dest: "/etc/grafana/provisioning/datasources/prometheus.yml"
+    owner: grafana
+    group: grafana
+    mode: 0644
+  notify: Reiniciar Grafana
+
+- name: Copiar la plantilla del Proveedor de Dashboards
+  ansible.builtin.template:
+    src: "dashboard-provider.yml.j2"
+    dest: "/etc/grafana/provisioning/dashboards/provider.yml"
+    owner: grafana
+    group: grafana
+    mode: 0644
+  notify: Reiniciar Grafana
+
+- name: Descargar el Dashboard de Node Exporter (ID 1860)
+  ansible.builtin.get_url:
+    url: "https://grafana.com/api/dashboards/1860/revisions/latest/download"
+    dest: "/var/lib/grafana/dashboards/node-exporter-full.json"
+    owner: grafana
+    group: grafana
+    mode: 0644
+  notify: Reiniciar Grafana
+
+# --- FIN DE TAREAS NUEVAS ---
+
+- name: Asegurar que el servicio Grafana esté habilitado e iniciado
+  ansible.builtin.systemd:
+    name: grafana-server
+    enabled: yes
+    state: started
